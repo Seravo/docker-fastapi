@@ -1,2 +1,1 @@
-# docker-fastapi
-FastAPI in Docker
+# FastAPI in Docker

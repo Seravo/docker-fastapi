@@ -1,0 +1,108 @@
+---
+name: Build and deploy images
+on:
+  schedule:
+    # rebuild every Thursday at 9:24 UTC
+    - cron: "24 9 * * 3"
+  push:
+    branches:
+      - main
+      - feature/**
+      - bugfix/**
+  pull_request:
+    branches:
+      - "*"
+
+env:
+  TAG: "${{ github.run_id }}"
+
+permissions:
+  contents: read
+  packages: write
+  actions: read
+
+jobs:
+  build-images:
+    name: Build Docker images
+    runs-on: ubuntu-latest
+    env:
+      image: ghcr.io/seravo/fastapi
+    steps:
+      - id: refname
+        name: Convert git refname to valid Docker tag
+        run: echo "::set-output name=refname::$(echo "${{ github.ref_name }}" |sed 's/\//-/g')"
+
+      - id: clone-repository
+        uses: actions/checkout@v2
+        name: Clone git repository
+
+      - id: docker-login
+        uses: Seravo/actions/docker-login@v0.20
+        name: Login to ghcr.io
+
+      # To speed up builds, try to use previously built image as cache source.
+      # However, skip this if we're running weekly scheduled build to ensure
+      # that we get latest APT versions at least once a week
+      - if: ${{ github.event_name != 'schedule' }}
+        name: Pull previously built image
+        id: docker-pull
+        uses: Seravo/actions/docker-pull@v0.20
+        with:
+          image: "${{ env.image }}"
+        continue-on-error: true
+
+      - if: ${{ github.event_name != 'schedule' }}
+        name: Pull previously built image by commit id
+        id: docker-pull-commit
+        uses: Seravo/actions/docker-pull@v0.20
+        with:
+          image: "${{ env.image }}:${{ github.sha }}"
+        continue-on-error: true
+
+      - id: docker-build
+        uses: Seravo/actions/docker-build@v0.20
+        name: Build image
+        with:
+          image: "${{ env.image }}"
+
+      - id: run-test-image
+        name: Run new image
+        run: docker run --rm -d -p 127.0.0.1:8080:8000 --name fastapi "${{ env.image }}"
+
+      - id: test-new-image
+        name: Test new image
+        # Sleep first to allow the app to fully start
+        run: sleep 2 && curl -iLsS http://127.0.0.1:8080/
+
+      - if: ${{ github.ref == 'refs/heads/main' }}
+        name: Push new image to production
+        id: docker-push-main
+        uses: Seravo/actions/docker-push@v0.20
+        with:
+          image: "${{ env.image }}"
+
+      - id: docker-tag-commit
+        name: Tag image with commit id
+        uses: Seravo/actions/docker-tag@v0.20
+        with:
+          source: "${{ env.image }}"
+          target: "${{ env.image }}-${{ github.sha }}"
+
+      - id: docker-push-commit
+        name: Push image with commit id
+        uses: Seravo/actions/docker-push@v0.20
+        with:
+          image: "${{ env.image }}-${{ github.sha }}"
+
+      - id: docker-tag-refname
+        name: Tag image with refname
+        uses: Seravo/actions/docker-tag@v0.20
+        with:
+          source: "${{ env.image }}"
+          target: "${{ env.image }}-${{ steps.refname.outputs.refname }}"
+
+      - id: docker-push-refname
+        name: Push image with refname
+        uses: Seravo/actions/docker-push@v0.20
+        with:
+          image: "${{ env.image }}-${{ steps.refname.outputs.refname }}"
