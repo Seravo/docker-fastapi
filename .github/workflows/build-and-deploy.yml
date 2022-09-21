@@ -86,23 +86,23 @@ jobs:
         uses: Seravo/actions/docker-tag@v0.20
         with:
           source: "${{ env.image }}"
-          target: "${{ env.image }}-${{ github.sha }}"
+          target: "${{ env.image }}:${{ github.sha }}"
 
       - id: docker-push-commit
         name: Push image with commit id
         uses: Seravo/actions/docker-push@v0.20
         with:
-          image: "${{ env.image }}-${{ github.sha }}"
+          image: "${{ env.image }}:${{ github.sha }}"
 
       - id: docker-tag-refname
         name: Tag image with refname
         uses: Seravo/actions/docker-tag@v0.20
         with:
           source: "${{ env.image }}"
-          target: "${{ env.image }}-${{ steps.refname.outputs.refname }}"
+          target: "${{ env.image }}:${{ steps.refname.outputs.refname }}"
 
       - id: docker-push-refname
         name: Push image with refname
         uses: Seravo/actions/docker-push@v0.20
         with:
-          image: "${{ env.image }}-${{ steps.refname.outputs.refname }}"
+          image: "${{ env.image }}:${{ steps.refname.outputs.refname }}"
