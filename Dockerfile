@@ -38,13 +38,13 @@ COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
 COPY app /app
+COPY reload.sh /usr/local/sbin/reload-gunicorn
 
 ENTRYPOINT [ \
     "gunicorn", \
     "--bind", "0.0.0.0", \
     "--workers", "4", \
-    "--worker-class", "uvicorn.workers.UvicornWorker", \
-    "--reload" \
+    "--worker-class", "uvicorn.workers.UvicornWorker" \
 ]
 CMD ["hello:app"]
 
