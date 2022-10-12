@@ -44,7 +44,8 @@ ENTRYPOINT [ \
     "gunicorn", \
     "--bind", "0.0.0.0", \
     "--workers", "4", \
-    "--worker-class", "uvicorn.workers.UvicornWorker" \
+    "--worker-class", "uvicorn.workers.UvicornWorker", \
+    "--access-logfile", "-" \
 ]
 CMD ["hello:app"]
 
