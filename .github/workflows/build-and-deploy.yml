@@ -14,7 +14,7 @@ on:
       - "*"
 
 env:
-  TAG: "${{ github.run_id }}"
+  image: ghcr.io/seravo/fastapi
 
 permissions:
   contents: read
@@ -25,8 +25,6 @@ jobs:
   build-images:
     name: Build Docker images
     runs-on: ubuntu-latest
-    env:
-      image: ghcr.io/seravo/fastapi
     steps:
       - id: refname
         name: Convert git refname to valid Docker tag
@@ -106,3 +104,55 @@ jobs:
         uses: Seravo/actions/docker-push@v0.20
         with:
           image: "${{ env.image }}:${{ steps.refname.outputs.refname }}"
+
+      - id: docker-export
+        name: Export FastAPI image as a tar
+        run: docker save ${{ env.image }} > /tmp/image.tar
+
+      - id: docker-artifact-push
+        name: Share docker image to other jobs with GHA artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-artifact
+          path: /tmp/image.tar
+          retention-days: 1
+
+  deploy-dockerhub:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    name: Deploy image to Dockerhub
+    needs: build-images
+    runs-on: ubuntu-latest
+    env:
+      hub_image: docker.io/seravo/fastapi
+    steps:
+      - id: artifact-download
+        name: Download saved Docker image
+        uses: actions/download-artifact@v3
+        with:
+          name: docker-artifact
+          path: /tmp
+
+      - id: docker-load
+        name: Load Docker image
+        run: docker load --input /tmp/image.tar
+
+      - id: docker-tag-dockerio
+        name: Tag API image for Docker Hub
+        uses: Seravo/actions/docker-tag@v0.20
+        with:
+          source: "${{ env.image }}"
+          target: "${{ env.hub_image }}"
+
+      - id: docker-login-hub
+        uses: Seravo/actions/docker-login@v0.20
+        name: Login to docker.io
+        with:
+          service: docker.io
+          username: "${{ secrets.DOCKER_HUB_USERNAME }}"
+          access-token: "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}"
+
+      - id: push-dockerio
+        name: Push API image to Docker Hub
+        uses: Seravo/actions/docker-push@v0.20
+        with:
+          image: "${{ env.hub_image }}"
