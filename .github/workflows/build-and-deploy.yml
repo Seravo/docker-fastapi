@@ -121,6 +121,7 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     name: Deploy image to Dockerhub
     needs: build-images
+    environment: production
     runs-on: ubuntu-latest
     env:
       hub_image: docker.io/seravo/fastapi
